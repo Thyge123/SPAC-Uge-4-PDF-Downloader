@@ -72,7 +72,7 @@ def download_file(index, row, download_errors):
             print(f"Downloading {index} from HTML URL...")
         
         # Download the file content
-        # verify=False skips SSL certificate validation (not recommended for sensitive data)
+        # verify=False skips SSL certificate validation
         response = requests.get(url, verify=False, timeout=30)
         
         # Check if the download was successful
@@ -117,7 +117,7 @@ def download_pdfs(download_queue, download_errors):
     
     # Show how many files we'll be downloading
     total_files = len(download_queue)
-    print(f"\n=== Starting download of {total_files} files ===\n")
+    print(f"\nStarting download of {total_files} files\n")
     
     # Create and start threads for each download
     threads = []
@@ -153,7 +153,7 @@ def download_pdfs(download_queue, download_errors):
         active_threads = sum(1 for t in threads if t.is_alive())
     
     # Final completion message
-    print("\n=== All downloads finished ===\n")
+    print("\nAll downloads finished\n")
 
 def create_output_report(download_queue, download_errors):
     """
@@ -183,7 +183,7 @@ def create_output_report(download_queue, download_errors):
             output.append([index, "Failed", error_msg])
 
     # Create a DataFrame from the output data
-    new_output_df = pd.DataFrame(output, columns=["Report ID", "Status", "Error Message"])
+    new_output_df = pd.DataFrame(output, columns=["Brnum", "Status", "Error Message"])
     
     # Define the output file path
     output_path = os.path.join(OUTPUT_DIR, "Download_Status.xlsx")
@@ -197,7 +197,7 @@ def create_output_report(download_queue, download_errors):
             # Combine existing data with new data
             output_df = pd.concat([existing_df, new_output_df], ignore_index=True)
             # Remove duplicates, keeping the latest entry if there's a conflict
-            output_df.drop_duplicates(subset=["Report ID"], keep="last", inplace=True)
+            output_df.drop_duplicates(subset=["Brnum"], keep="last", inplace=True)
         except Exception as e:
             print(f"Error reading existing report file: {e}")
             print("Creating a new report file instead.")
@@ -277,11 +277,9 @@ def update_metadata(download_queue, reports_data):
     updated_metadata.to_excel(METADATA_PATH, index=False)
     print(f"Saved updated metadata with {len(updated_metadata)} entries to: {METADATA_PATH}")
 
+#Upload the downloaded PDF files to Google Drive.
 def upload_to_drive():
-    """
-    Upload the downloaded PDF files to Google Drive.
-    """
-    print("\n=== Starting Google Drive Upload ===\n")
+    print("\nStarting Google Drive Upload\n")
     
     # Check if client_secrets.json exists
     if not os.path.exists("client_secrets.json"):
@@ -345,6 +343,11 @@ def upload_to_drive():
             folder = drive.CreateFile(folder_metadata)
             folder.Upload()
             folder_id = folder['id']
+            folder.InsertPermission({
+                'type': 'anyone',
+                'value': 'anyone',
+                'role': 'reader'
+            })
             print(f"Created new folder: {folder_name}")
         
         # Upload each file to Google Drive
@@ -375,12 +378,15 @@ def upload_to_drive():
                 
                 # Report the status
                 print(f"✓ Uploaded {file_name} to Google Drive")
+               
                 successful_uploads += 1
-                
+            
             except Exception as e:
                 print(f"✗ Error uploading {file_name}: {str(e)}")
-        
+
+        # Print the folder link and upload status      
         print(f"\nUploaded {successful_uploads} of {len(downloaded_files)} files to Google Drive")
+        print(f"\nFolder: https://drive.google.com/drive/folders/{folder_id}")
         return True
             
     except Exception as e:
@@ -394,7 +400,7 @@ def upload_to_drive():
 def main():
     """Main program that orchestrates the PDF download process."""
 
-    # Read the Excel file containing report information
+    # Read the Excel file
     try:
         print(f"\nReading reports data from {REPORTS_PATH}...")
         reports_data = pd.read_excel(REPORTS_PATH, sheet_name=0, index_col=ID_COLUMN)
